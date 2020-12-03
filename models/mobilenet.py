@@ -12,8 +12,11 @@ class Block(nn.Module):
     '''Depthwise conv + Pointwise conv'''
     def __init__(self, in_planes, out_planes, stride=1):
         super(Block, self).__init__()
+        # Depthwise convolution: have in_planes kernels with size 3*3*1, each kernel for 1 channel 
         self.conv1 = nn.Conv2d(in_planes, in_planes, kernel_size=3, stride=stride, padding=1, groups=in_planes, bias=False)
         self.bn1 = nn.BatchNorm2d(in_planes)
+
+        # Pointwise convolution: have out_planes kernel with size 1*1*in_planes 
         self.conv2 = nn.Conv2d(in_planes, out_planes, kernel_size=1, stride=1, padding=0, bias=False)
         self.bn2 = nn.BatchNorm2d(out_planes)
 
