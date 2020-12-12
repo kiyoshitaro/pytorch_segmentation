@@ -14,3 +14,7 @@ from .mobilenet import *
 from .mobilenetv2 import *
 from .efficientnet import *
 from .regnet import *
+from .mnasnet import *
+from .squeezenet import *
+from .rfbnet import *
+from .gan import *
