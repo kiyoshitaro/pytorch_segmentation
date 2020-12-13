@@ -2,6 +2,20 @@
 # -*- coding:utf-8 -*-
 # Author: Xiangtai(lxt@pku.edu.cn)
 # Pytorch implementation of Dual-GCN net
+
+'''ResNet in PyTorch.
+
+For Pre-activation ResNet, see 'preact_resnet.py'.
+
+Reference:
+[1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
+    Deep Residual Learning for Image Recognition. arXiv:1512.03385
+[2] Zhang, L., Li, X., Arnab, A., Yang, K., Ai, K., Tong, Y., & Torr, P. H. S. (n.d.). 
+    Dual Graph Convolutional Network for Semantic Segmentation. Retrieved from https://github.com/lzrobots/DGCNet
+[3] https://github.com/lxtGH/GALD-DGCNet/blob/master/libs/models/DualGCNNet.py
+'''
+
+
 import torch
 import torch.nn.functional as F
 import torch.nn as nn
@@ -56,7 +70,7 @@ class Bottleneck(nn.Module):
         out = self.relu_inplace(out)
 
         return out
-        
+
 class SpatialGCN(nn.Module):
     def __init__(self, plane):
         super(SpatialGCN, self).__init__()

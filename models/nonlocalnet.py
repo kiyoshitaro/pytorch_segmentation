@@ -5,6 +5,9 @@ For Pre-activation ResNet, see 'preact_resnet.py'.
 Reference:
 [1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
     Deep Residual Learning for Image Recognition. arXiv:1512.03385
+[2] Wang, X., Girshick, R., Gupta, A., & He, K. (2018). 
+    Non-local Neural Networks. 2018 IEEE/CVF Conference on Computer Vision and Pattern Recognition. https://doi.org/10.1109/CVPR.2018.00813
+[3] https://github.com/tea1528/Non-Local-NN-Pytorch/blob/master/models/resnet2D.py
 '''
 import torch
 import torch.nn as nn

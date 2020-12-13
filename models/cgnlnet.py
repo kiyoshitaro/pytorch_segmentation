@@ -5,8 +5,9 @@ For Pre-activation ResNet, see 'preact_resnet.py'.
 Reference:
 [1] Kaiming He, Xiangyu Zhang, Shaoqing Ren, Jian Sun
     Deep Residual Learning for Image Recognition. arXiv:1512.03385
-[2] https://github.com/KaiyuYue/cgnl-network.pytorch
-[3] https://arxiv.org/pdf/1711.07971.pdf
+[2] Yue, K., Sun, M., Yuan, Y., Zhou, F., Ding, E., Xu, F., … Research, B. (n.d.). 
+    Compact Generalized Non-local Network. Retrieved from https://github.com/KaiyuYue/cgnl-network.pytorch.
+[3] https://arxiv.org/pdf/1909.07229.pdf
 '''
 
 import math
