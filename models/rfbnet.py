@@ -5,11 +5,19 @@ import math
 
 
 class BasicConv2d(nn.Module):
-    def __init__(self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1):
+    def __init__(
+        self, in_planes, out_planes, kernel_size, stride=1, padding=0, dilation=1
+    ):
         super(BasicConv2d, self).__init__()
-        self.conv = nn.Conv2d(in_planes, out_planes,
-                              kernel_size=kernel_size, stride=stride,
-                              padding=padding, dilation=dilation, bias=False)
+        self.conv = nn.Conv2d(
+            in_planes,
+            out_planes,
+            kernel_size=kernel_size,
+            stride=stride,
+            padding=padding,
+            dilation=dilation,
+            bias=False,
+        )
         self.bn = nn.BatchNorm2d(out_planes)
         self.relu = nn.ReLU(inplace=True)
 
@@ -18,11 +26,21 @@ class BasicConv2d(nn.Module):
         x = self.bn(x)
         return x
 
+
 class Bottle2neck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, downsample=None, baseWidth=26, scale=4, stype='normal'):
-        """ Constructor
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        downsample=None,
+        baseWidth=26,
+        scale=4,
+        stype="normal",
+    ):
+        """Constructor
         Args:
             inplanes: input channel dimensionality
             planes: output channel dimensionality
@@ -42,17 +60,23 @@ class Bottle2neck(nn.Module):
             self.nums = 1
         else:
             self.nums = scale - 1
-        if stype == 'stage':
+        if stype == "stage":
             self.pool = nn.AvgPool2d(kernel_size=3, stride=stride, padding=1)
         convs = []
         bns = []
         for i in range(self.nums):
-            convs.append(nn.Conv2d(width, width, kernel_size=3, stride=stride, padding=1, bias=False))
+            convs.append(
+                nn.Conv2d(
+                    width, width, kernel_size=3, stride=stride, padding=1, bias=False
+                )
+            )
             bns.append(nn.BatchNorm2d(width))
         self.convs = nn.ModuleList(convs)
         self.bns = nn.ModuleList(bns)
 
-        self.conv3 = nn.Conv2d(width * scale, planes * self.expansion, kernel_size=1, bias=False)
+        self.conv3 = nn.Conv2d(
+            width * scale, planes * self.expansion, kernel_size=1, bias=False
+        )
         self.bn3 = nn.BatchNorm2d(planes * self.expansion)
 
         self.relu = nn.ReLU(inplace=True)
@@ -70,7 +94,7 @@ class Bottle2neck(nn.Module):
 
         spx = torch.split(out, self.width, 1)
         for i in range(self.nums):
-            if i == 0 or self.stype == 'stage':
+            if i == 0 or self.stype == "stage":
                 sp = spx[i]
             else:
                 sp = sp + spx[i]
@@ -80,9 +104,9 @@ class Bottle2neck(nn.Module):
                 out = sp
             else:
                 out = torch.cat((out, sp), 1)
-        if self.scale != 1 and self.stype == 'normal':
+        if self.scale != 1 and self.stype == "normal":
             out = torch.cat((out, spx[self.nums]), 1)
-        elif self.scale != 1 and self.stype == 'stage':
+        elif self.scale != 1 and self.stype == "stage":
             out = torch.cat((out, self.pool(spx[self.nums])), 1)
 
         out = self.conv3(out)
@@ -96,6 +120,7 @@ class Bottle2neck(nn.Module):
 
         return out
 
+
 class RFB_modified(nn.Module):
     def __init__(self, in_channel, out_channel):
         super(RFB_modified, self).__init__()
@@ -107,21 +132,21 @@ class RFB_modified(nn.Module):
             BasicConv2d(in_channel, out_channel, 1),
             BasicConv2d(out_channel, out_channel, kernel_size=(1, 3), padding=(0, 1)),
             BasicConv2d(out_channel, out_channel, kernel_size=(3, 1), padding=(1, 0)),
-            BasicConv2d(out_channel, out_channel, 3, padding=3, dilation=3)
+            BasicConv2d(out_channel, out_channel, 3, padding=3, dilation=3),
         )
         self.branch2 = nn.Sequential(
             BasicConv2d(in_channel, out_channel, 1),
             BasicConv2d(out_channel, out_channel, kernel_size=(1, 5), padding=(0, 2)),
             BasicConv2d(out_channel, out_channel, kernel_size=(5, 1), padding=(2, 0)),
-            BasicConv2d(out_channel, out_channel, 3, padding=5, dilation=5)
+            BasicConv2d(out_channel, out_channel, 3, padding=5, dilation=5),
         )
         self.branch3 = nn.Sequential(
             BasicConv2d(in_channel, out_channel, 1),
             BasicConv2d(out_channel, out_channel, kernel_size=(1, 7), padding=(0, 3)),
             BasicConv2d(out_channel, out_channel, kernel_size=(7, 1), padding=(3, 0)),
-            BasicConv2d(out_channel, out_channel, 3, padding=7, dilation=7)
+            BasicConv2d(out_channel, out_channel, 3, padding=7, dilation=7),
         )
-        self.conv_cat = BasicConv2d(4*out_channel, out_channel, 3, padding=1)
+        self.conv_cat = BasicConv2d(4 * out_channel, out_channel, 3, padding=1)
         self.conv_res = BasicConv2d(in_channel, out_channel, 1)
 
     def forward(self, x):
@@ -142,23 +167,26 @@ class aggregation(nn.Module):
         super(aggregation, self).__init__()
         self.relu = nn.ReLU(True)
 
-        self.upsample = nn.Upsample(scale_factor=2, mode='bilinear', align_corners=True)
+        self.upsample = nn.Upsample(scale_factor=2, mode="bilinear", align_corners=True)
         self.conv_upsample1 = BasicConv2d(channel, channel, 3, padding=1)
         self.conv_upsample2 = BasicConv2d(channel, channel, 3, padding=1)
         self.conv_upsample3 = BasicConv2d(channel, channel, 3, padding=1)
         self.conv_upsample4 = BasicConv2d(channel, channel, 3, padding=1)
-        self.conv_upsample5 = BasicConv2d(2*channel, 2*channel, 3, padding=1)
+        self.conv_upsample5 = BasicConv2d(2 * channel, 2 * channel, 3, padding=1)
 
-        self.conv_concat2 = BasicConv2d(2*channel, 2*channel, 3, padding=1)
-        self.conv_concat3 = BasicConv2d(3*channel, 3*channel, 3, padding=1)
-        self.conv4 = BasicConv2d(3*channel, 3*channel, 3, padding=1)
-        self.conv5 = nn.Conv2d(3*channel, 1, 1)
+        self.conv_concat2 = BasicConv2d(2 * channel, 2 * channel, 3, padding=1)
+        self.conv_concat3 = BasicConv2d(3 * channel, 3 * channel, 3, padding=1)
+        self.conv4 = BasicConv2d(3 * channel, 3 * channel, 3, padding=1)
+        self.conv5 = nn.Conv2d(3 * channel, 1, 1)
 
     def forward(self, x1, x2, x3):
         x1_1 = x1
         x2_1 = self.conv_upsample1(self.upsample(x1)) * x2
-        x3_1 = self.conv_upsample2(self.upsample(self.upsample(x1))) \
-               * self.conv_upsample3(self.upsample(x2)) * x3
+        x3_1 = (
+            self.conv_upsample2(self.upsample(self.upsample(x1)))
+            * self.conv_upsample3(self.upsample(x2))
+            * x3
+        )
 
         x2_2 = torch.cat((x2_1, self.conv_upsample4(self.upsample(x1_1))), 1)
         x2_2 = self.conv_concat2(x2_2)
@@ -173,7 +201,6 @@ class aggregation(nn.Module):
 
 
 class Res2Net(nn.Module):
-
     def __init__(self, block, layers, baseWidth=26, scale=4, num_classes=1000):
         self.inplanes = 64
         super(Res2Net, self).__init__()
@@ -186,7 +213,7 @@ class Res2Net(nn.Module):
             nn.Conv2d(32, 32, 3, 1, 1, bias=False),
             nn.BatchNorm2d(32),
             nn.ReLU(inplace=True),
-            nn.Conv2d(32, 64, 3, 1, 1, bias=False)
+            nn.Conv2d(32, 64, 3, 1, 1, bias=False),
         )
         self.bn1 = nn.BatchNorm2d(64)
         self.relu = nn.ReLU()
@@ -200,7 +227,7 @@ class Res2Net(nn.Module):
 
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                nn.init.kaiming_normal_(m.weight, mode='fan_out', nonlinearity='relu')
+                nn.init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
             elif isinstance(m, nn.BatchNorm2d):
                 nn.init.constant_(m.weight, 1)
                 nn.init.constant_(m.bias, 0)
@@ -209,19 +236,39 @@ class Res2Net(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.AvgPool2d(kernel_size=stride, stride=stride,
-                             ceil_mode=True, count_include_pad=False),
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=1, bias=False),
+                nn.AvgPool2d(
+                    kernel_size=stride,
+                    stride=stride,
+                    ceil_mode=True,
+                    count_include_pad=False,
+                ),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=1,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
         layers = []
-        layers.append(block(self.inplanes, planes, stride, downsample=downsample,
-                            stype='stage', baseWidth=self.baseWidth, scale=self.scale))
+        layers.append(
+            block(
+                self.inplanes,
+                planes,
+                stride,
+                downsample=downsample,
+                stype="stage",
+                baseWidth=self.baseWidth,
+                scale=self.scale,
+            )
+        )
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes, baseWidth=self.baseWidth, scale=self.scale))
+            layers.append(
+                block(self.inplanes, planes, baseWidth=self.baseWidth, scale=self.scale)
+            )
 
         return nn.Sequential(*layers)
 
@@ -276,20 +323,21 @@ class RFBNet(nn.Module):
         x = self.resnet.conv1(x)
         x = self.resnet.bn1(x)
         x = self.resnet.relu(x)
-        x = self.resnet.maxpool(x)      # bs, 64, 88, 88
+        x = self.resnet.maxpool(x)  # bs, 64, 88, 88
         # ---- low-level features ----
-        x1 = self.resnet.layer1(x)      # bs, 256, 88, 88
-        x2 = self.resnet.layer2(x1)     # bs, 512, 44, 44
+        x1 = self.resnet.layer1(x)  # bs, 256, 88, 88
+        x2 = self.resnet.layer2(x1)  # bs, 512, 44, 44
 
-        x3 = self.resnet.layer3(x2)     # bs, 1024, 22, 22
-        x4 = self.resnet.layer4(x3)     # bs, 2048, 11, 11
-        x2_rfb = self.rfb2_1(x2)        # channel -> 32
-        x3_rfb = self.rfb3_1(x3)        # channel -> 32
-        x4_rfb = self.rfb4_1(x4)        # channel -> 32
+        x3 = self.resnet.layer3(x2)  # bs, 1024, 22, 22
+        x4 = self.resnet.layer4(x3)  # bs, 2048, 11, 11
+        x2_rfb = self.rfb2_1(x2)  # channel -> 32
+        x3_rfb = self.rfb3_1(x3)  # channel -> 32
+        x4_rfb = self.rfb4_1(x4)  # channel -> 32
 
         ra5_feat = self.agg1(x4_rfb, x3_rfb, x2_rfb)
-        lateral_map_5 = F.interpolate(ra5_feat, scale_factor=8, mode='bilinear')    # NOTES: Sup-1 (bs, 1, 44, 44) -> (bs, 1, 352, 352)
-
+        lateral_map_5 = F.interpolate(
+            ra5_feat, scale_factor=8, mode="bilinear"
+        )  # NOTES: Sup-1 (bs, 1, 44, 44) -> (bs, 1, 352, 352)
 
         return lateral_map_5
 
@@ -301,11 +349,12 @@ def res2net50_v1b_26w_4s(pretrained=False, **kwargs):
     """
     model = Res2Net(Bottle2neck, [3, 4, 6, 3], baseWidth=26, scale=4, **kwargs)
     if pretrained:
-        model_state = torch.load('/media/nercms/NERCMS/GepengJi/Medical_Seqmentation/CRANet/models/res2net50_v1b_26w_4s-3cf99910.pth')
+        model_state = torch.load(
+            "/media/nercms/NERCMS/GepengJi/Medical_Seqmentation/CRANet/models/res2net50_v1b_26w_4s-3cf99910.pth"
+        )
         model.load_state_dict(model_state)
         # lib.load_state_dict(model_zoo.load_url(model_urls['res2net50_v1b_26w_4s']))
     return model
-
 
 
 def test():
@@ -315,5 +364,5 @@ def test():
     print(y.shape)
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     test()

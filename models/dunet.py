@@ -12,7 +12,6 @@
 """
 
 
-
 import torch.nn as nn
 from torch.nn import functional as F
 import torch
@@ -22,6 +21,8 @@ import shutil
 from tensorboardX import SummaryWriter
 
 affine_par = True
+
+
 def load_pretrained_model(net, state_dict, strict=True):
     """Copies parameters and buffers from :attr:`state_dict` into
     this module and its descendants. If :attr:`strict` is ``True`` then
@@ -47,71 +48,104 @@ def load_pretrained_model(net, state_dict, strict=True):
                 try:
                     own_state[name].copy_(param)
                 except Exception:
-                    raise RuntimeError('While copying the parameter named {}, '
-                                       'whose dimensions in the model are {} and '
-                                       'whose dimensions in the checkpoint are {}.'
-                                       .format(name, own_state[name].size(), param.size()))
+                    raise RuntimeError(
+                        "While copying the parameter named {}, "
+                        "whose dimensions in the model are {} and "
+                        "whose dimensions in the checkpoint are {}.".format(
+                            name, own_state[name].size(), param.size()
+                        )
+                    )
             else:
                 try:
                     own_state[name].copy_(param)
                 except Exception:
-                    print('Ignoring Error: While copying the parameter named {}, '
-                                       'whose dimensions in the model are {} and '
-                                       'whose dimensions in the checkpoint are {}.'
-                                       .format(name, own_state[name].size(), param.size()))
+                    print(
+                        "Ignoring Error: While copying the parameter named {}, "
+                        "whose dimensions in the model are {} and "
+                        "whose dimensions in the checkpoint are {}.".format(
+                            name, own_state[name].size(), param.size()
+                        )
+                    )
 
         elif strict:
-            raise KeyError('unexpected key "{}" in state_dict'
-                           .format(name))
+            raise KeyError('unexpected key "{}" in state_dict'.format(name))
     if strict:
         missing = set(own_state.keys()) - set(state_dict.keys())
         if len(missing) > 0:
             raise KeyError('missing keys in state_dict: "{}"'.format(missing))
 
+
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
+    )
+
 
 class DUpsampling(nn.Module):
     def __init__(self, inplanes, scale, num_class=21, pad=0):
         super(DUpsampling, self).__init__()
         ## W matrix
-        self.conv_w = nn.Conv2d(inplanes, num_class * scale * scale, kernel_size=1, padding = pad,bias=False)
+        self.conv_w = nn.Conv2d(
+            inplanes, num_class * scale * scale, kernel_size=1, padding=pad, bias=False
+        )
         ## P matrix
-        self.conv_p = nn.Conv2d(num_class * scale * scale, inplanes, kernel_size=1, padding = pad,bias=False)
+        self.conv_p = nn.Conv2d(
+            num_class * scale * scale, inplanes, kernel_size=1, padding=pad, bias=False
+        )
 
         self.scale = scale
-    
+
     def forward(self, x):
         x = self.conv_w(x)
         N, C, H, W = x.size()
 
         # N, W, H, C
-        x_permuted = x.permute(0, 3, 2, 1) 
+        x_permuted = x.permute(0, 3, 2, 1)
 
         # N, W, H*scale, C/scale
-        x_permuted = x_permuted.contiguous().view((N, W, H * self.scale, int(C / (self.scale))))
+        x_permuted = x_permuted.contiguous().view(
+            (N, W, H * self.scale, int(C / (self.scale)))
+        )
 
         # N, H*scale, W, C/scale
         x_permuted = x_permuted.permute(0, 2, 1, 3)
         # N, H*scale, W*scale, C/(scale**2)
-        x_permuted = x_permuted.contiguous().view((N, W * self.scale, H * self.scale, int(C / (self.scale * self.scale))))
+        x_permuted = x_permuted.contiguous().view(
+            (N, W * self.scale, H * self.scale, int(C / (self.scale * self.scale)))
+        )
 
         # N, C/(scale**2), H*scale, W*scale
         x = x_permuted.permute(0, 3, 1, 2)
-        
+
         return x
-        
+
+
 class Bottleneck(nn.Module):
     expansion = 4
 
-    def __init__(self, inplanes, planes, stride=1, dilation=1, downsample=None, fist_dilation=1, multi_grid=1):
+    def __init__(
+        self,
+        inplanes,
+        planes,
+        stride=1,
+        dilation=1,
+        downsample=None,
+        fist_dilation=1,
+        multi_grid=1,
+    ):
         super(Bottleneck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                            padding=dilation * multi_grid, dilation=dilation * multi_grid, bias=False)
+        self.conv2 = nn.Conv2d(
+            planes,
+            planes,
+            kernel_size=3,
+            stride=stride,
+            padding=dilation * multi_grid,
+            dilation=dilation * multi_grid,
+            bias=False,
+        )
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes * 4)
@@ -142,12 +176,12 @@ class Bottleneck(nn.Module):
 
         return out
 
+
 class ResNet(nn.Module):
     def __init__(self, block, layers):
         self.inplanes = 128
         super(ResNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3,
-                               bias=False)
+        self.conv1 = nn.Conv2d(3, 64, kernel_size=7, stride=2, padding=3, bias=False)
         self.bn1 = nn.BatchNorm2d(64)
         self.relu1 = nn.ReLU(inplace=False)
         # self.conv2 = conv3x3(64, 64)
@@ -162,28 +196,56 @@ class ResNet(nn.Module):
         self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
 
         self.relu = nn.ReLU(inplace=False)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1, ceil_mode=False)  # change
+        self.maxpool = nn.MaxPool2d(
+            kernel_size=3, stride=2, padding=1, ceil_mode=False
+        )  # change
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2)
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2)
-        self.layer4 = self._make_layer(block, 512, layers[3], stride=1, dilation=2, multi_grid=(1, 1, 1))
+        self.layer4 = self._make_layer(
+            block, 512, layers[3], stride=1, dilation=2, multi_grid=(1, 1, 1)
+        )
 
     def _make_layer(self, block, planes, blocks, stride=1, dilation=1, multi_grid=1):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
-                nn.BatchNorm2d(planes * block.expansion, affine=affine_par))
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                ),
+                nn.BatchNorm2d(planes * block.expansion, affine=affine_par),
+            )
 
         layers = []
-        generate_multi_grid = lambda index, grids: grids[index % len(grids)] if isinstance(grids, tuple) else 1
-        layers.append(block(self.inplanes, planes, stride, dilation=dilation, downsample=downsample,
-                            multi_grid=generate_multi_grid(0, multi_grid)))
+        generate_multi_grid = (
+            lambda index, grids: grids[index % len(grids)]
+            if isinstance(grids, tuple)
+            else 1
+        )
+        layers.append(
+            block(
+                self.inplanes,
+                planes,
+                stride,
+                dilation=dilation,
+                downsample=downsample,
+                multi_grid=generate_multi_grid(0, multi_grid),
+            )
+        )
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes, dilation=dilation,
-                                multi_grid=generate_multi_grid(i, multi_grid)))
+            layers.append(
+                block(
+                    self.inplanes,
+                    planes,
+                    dilation=dilation,
+                    multi_grid=generate_multi_grid(i, multi_grid),
+                )
+            )
 
         return nn.Sequential(*layers)
 
@@ -192,7 +254,7 @@ class ResNet(nn.Module):
         x = self.relu1(self.bn1(self.conv1(x)))  # 264 * 264
         # x = self.relu2(self.bn2(self.conv2(x)))  # 264 * 264
         # x = self.relu3(self.bn3(self.conv3(x)))  # 264 * 264
-        
+
         x_13 = x
         x = self.maxpool(x)  # 66 * 66
         x = self.layer1(x)  # 66 * 66
@@ -201,19 +263,24 @@ class ResNet(nn.Module):
         x_46 = x
         x = self.layer4(x)  # 33 * 33
 
-        x_13 = F.interpolate(x_13, [x_46.size()[2],x_46.size()[3]], mode='bilinear', align_corners=True)
+        x_13 = F.interpolate(
+            x_13, [x_46.size()[2], x_46.size()[3]], mode="bilinear", align_corners=True
+        )
         x_low = torch.cat((x_13, x_46), dim=1)
         return x, x_low
 
+
 class Encoder(nn.Module):
-    def __init__(self, pretrain = False, model_path = ' '):
+    def __init__(self, pretrain=False, model_path=" "):
         super(Encoder, self).__init__()
         self.model = ResNet(Bottleneck, [3, 4, 6, 3])
         if pretrain:
             load_pretrained_model(self.model, torch.load(model_path), strict=False)
+
     def forward(self, x):
         x, x_low = self.model(x)
         return x, x_low
+
 
 class Decoder(nn.Module):
     def __init__(self, num_class, bn_momentum=0.1):
@@ -262,11 +329,13 @@ class Decoder(nn.Module):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
 
+
 class DUNet(nn.Module):
-    def __init__(self, encoder_pretrain = False, model_path = ' ', num_class=21):
+    def __init__(self, encoder_pretrain=False, model_path=" ", num_class=21):
         super(DUNet, self).__init__()
         self.encoder = Encoder(pretrain=encoder_pretrain, model_path=model_path)
         self.decoder = Decoder(num_class)
+
     def forward(self, x):
         x, x_low = self.encoder(x)
         x = self.decoder(x, x_low)
@@ -327,7 +396,7 @@ class DUNet(nn.Module):
 #         save_filename = '%s_net_%s.pth' % (epoch_label,network_label)
 #         if not save_dir:
 #             save_dir = self.model_dir
-#         save_path = os.path.join(save_dir, save_filename)        
+#         save_path = os.path.join(save_dir, save_filename)
 #         if not os.path.isfile(save_path):
 #             print('%s not exists yet!' % save_path)
 #         else:
@@ -336,18 +405,18 @@ class DUNet(nn.Module):
 #                 # print torch.load(save_path).keys()
 #                 # print network.state_dict()['Scale.features.conv2_1_depthconvweight']
 #                 network.load_state_dict(torch.load(save_path))
-#             except:   
-#                 pretrained_dict = torch.load(save_path)                
+#             except:
+#                 pretrained_dict = torch.load(save_path)
 #                 model_dict = network.state_dict()
 #                 try:
-#                     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}                    
+#                     pretrained_dict = {k: v for k, v in pretrained_dict.items() if k in model_dict}
 #                     network.load_state_dict(pretrained_dict)
 #                     print('Pretrained network has excessive layers; Only loading layers that are used' )
 #                 except:
 #                     print('Pretrained network has fewer layers; The following are not initialized:' )
 #                     # from sets import Set
 #                     # not_initialized = Set()
-#                     for k, v in pretrained_dict.items():                      
+#                     for k, v in pretrained_dict.items():
 #                         if v.size() == model_dict[k].size():
 #                             model_dict[k] = v
 #                     not_initialized=[]
@@ -357,7 +426,7 @@ class DUNet(nn.Module):
 #                         if k not in pretrained_dict or v.size() != pretrained_dict[k].size():
 #                             not_initialized+=[k]#[k.split('.')[0]]
 #                     print(sorted(not_initialized))
-#                     network.load_state_dict(model_dict)                  
+#                     network.load_state_dict(model_dict)
 
 # class DUNet_Solver(BaseModel):
 #     def __init__(self, opt):
@@ -368,7 +437,7 @@ class DUNet(nn.Module):
 #         #self.device =
 #         if self.opt.isTrain:
 #             self.criterionSeg = torch.nn.CrossEntropyLoss(ignore_index=255).cuda()
-#             self.optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()), 
+#             self.optimizer = torch.optim.SGD(filter(lambda p: p.requires_grad, self.model.parameters()),
 #                                                     lr=self.opt.lr, momentum=self.opt.momentum,
 #                                                     weight_decay=self.opt.wd)
 #             params_w = list(self.model.decoder.dupsample.conv_w.parameters())
@@ -405,12 +474,12 @@ class DUNet(nn.Module):
 #         # N, H, W, C
 #         self.seggt_onehot = self.seggt_onehot.permute(0, 2, 3, 1)
 #         # N, H, W/sacle, C*scale
-#         self.seggt_onehot = self.seggt_onehot.contiguous().view((N, H, 
+#         self.seggt_onehot = self.seggt_onehot.contiguous().view((N, H,
 #                                         int(W / scale), C * scale))
 #         # N, W/sacle, H, C*scale
 #         self.seggt_onehot = self.seggt_onehot.permute(0, 2, 1, 3)
 
-#         self.seggt_onehot = self.seggt_onehot.contiguous().view((N, int(W / scale), 
+#         self.seggt_onehot = self.seggt_onehot.contiguous().view((N, int(W / scale),
 #                                         int(H / scale), C * scale * scale))
 
 #         self.seggt_onehot = self.seggt_onehot.permute(0, 3, 2, 1)
@@ -472,7 +541,6 @@ class DUNet(nn.Module):
 #     def freeze_w(self):
 #         for param in self.model.decoder.dupsample.parameters():
 #             param.requires_grad = False
-            
 
 
 #     def update_tensorboard(self, data, step):
@@ -521,8 +589,8 @@ class DUNet(nn.Module):
 #         return 'DUNet'
 
 
-if __name__ == '__main__':
-    device=torch.device("cuda:0")
+if __name__ == "__main__":
+    device = torch.device("cuda:0")
     input = torch.rand(1, 3, 528, 528)
     input = input.to(device)
     net = DUNet()

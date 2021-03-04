@@ -1,5 +1,3 @@
-
-
 """
 https://arxiv.org/pdf/1602.07360.pdf
 """
@@ -26,7 +24,9 @@ class fire(nn.Module):
         # expand layer: increase it
         self.conv2 = nn.Conv2d(squeeze_planes, expand_planes, kernel_size=1, stride=1)
         self.bn2 = nn.BatchNorm2d(expand_planes)
-        self.conv3 = nn.Conv2d(squeeze_planes, expand_planes, kernel_size=3, stride=1, padding=1)
+        self.conv3 = nn.Conv2d(
+            squeeze_planes, expand_planes, kernel_size=3, stride=1, padding=1
+        )
         self.bn3 = nn.BatchNorm2d(expand_planes)
         self.relu2 = nn.ReLU(inplace=True)
 
@@ -34,7 +34,7 @@ class fire(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
-                m.weight.data.normal_(0, math.sqrt(2./n))
+                m.weight.data.normal_(0, math.sqrt(2.0 / n))
 
     def forward(self, x):
         x = self.conv1(x)
@@ -52,19 +52,19 @@ class fire(nn.Module):
 class SqueezeNet(nn.Module):
     def __init__(self):
         super(SqueezeNet, self).__init__()
-        self.conv1 = nn.Conv2d(3, 96, kernel_size=3, stride=1, padding=1) # 32
+        self.conv1 = nn.Conv2d(3, 96, kernel_size=3, stride=1, padding=1)  # 32
         self.bn1 = nn.BatchNorm2d(96)
         self.relu = nn.ReLU(inplace=True)
-        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2) # 16
+        self.maxpool1 = nn.MaxPool2d(kernel_size=2, stride=2)  # 16
         self.fire2 = fire(96, 16, 64)
         self.fire3 = fire(128, 16, 64)
         self.fire4 = fire(128, 32, 128)
-        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2) # 8
+        self.maxpool2 = nn.MaxPool2d(kernel_size=2, stride=2)  # 8
         self.fire5 = fire(256, 32, 128)
         self.fire6 = fire(256, 48, 192)
         self.fire7 = fire(384, 48, 192)
         self.fire8 = fire(384, 64, 256)
-        self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2) # 4
+        self.maxpool3 = nn.MaxPool2d(kernel_size=2, stride=2)  # 4
         self.fire9 = fire(512, 64, 256)
         self.conv2 = nn.Conv2d(512, 10, kernel_size=1, stride=1)
         self.avg_pool = nn.AvgPool2d(kernel_size=4, stride=4)
@@ -72,11 +72,10 @@ class SqueezeNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.in_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
+                m.weight.data.normal_(0, math.sqrt(2.0 / n))
             elif isinstance(m, nn.BatchNorm2d):
                 m.weight.data.fill_(1)
                 m.bias.data.zero_()
-
 
     def forward(self, x):
         x = self.conv1(x)
@@ -98,9 +97,11 @@ class SqueezeNet(nn.Module):
         x = self.softmax(x)
         return x
 
+
 def fire_layer(inp, s, e):
     f = fire(inp, s, e)
     return f
+
 
 def squeezenet(pretrained=False):
     net = SqueezeNet()

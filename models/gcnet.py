@@ -9,42 +9,43 @@ https://github.com/dl19940602/GCnet-pytorch/blob/master/GCnet_all.py
 import torch
 from torch import nn
 
-__all__ = ['GC_all_resnet50','SNL_resnet50',]
+__all__ = [
+    "GC_all_resnet50",
+    "SNL_resnet50",
+]
 
 
 class SNLblock2d(nn.Module):
-
-    def __init__(self, inplanes, planes, pool='att', fusions=['channel_add']):
+    def __init__(self, inplanes, planes, pool="att", fusions=["channel_add"]):
         super(SNLblock2d, self).__init__()
-        assert pool in ['avg', 'att']
-        assert all([f in ['channel_add', 'channel_mul'] for f in fusions])
-        assert len(fusions) > 0, 'at least one fusion should be used'
+        assert pool in ["avg", "att"]
+        assert all([f in ["channel_add", "channel_mul"] for f in fusions])
+        assert len(fusions) > 0, "at least one fusion should be used"
         self.inplanes = inplanes
         self.planes = planes
         self.pool = pool
         self.fusions = fusions
-        if 'att' in pool:
-            self.conv_mask = nn.Conv2d(inplanes, 1, kernel_size=1)#context Modeling
+        if "att" in pool:
+            self.conv_mask = nn.Conv2d(inplanes, 1, kernel_size=1)  # context Modeling
             self.softmax = nn.Softmax(dim=2)
         else:
             self.avg_pool = nn.AdaptiveAvgPool2d(1)
 
-        if 'channel_add' in fusions:
+        if "channel_add" in fusions:
             self.channel_add_conv = nn.Conv2d(self.inplanes, self.planes, kernel_size=1)
-         
+
         else:
             self.channel_add_conv = None
 
-        if 'channel_mul' in fusions:
+        if "channel_mul" in fusions:
             self.channel_mul_conv = nn.Conv2d(self.inplanes, self.planes, kernel_size=1)
-             
+
         else:
             self.channel_mul_conv = None
 
-
     def spatial_pool(self, x):
         batch, channel, height, width = x.size()
-        if self.pool == 'att':
+        if self.pool == "att":
             input_x = x
             # [N, C, H * W]
             input_x = input_x.view(batch, channel, height * width)
@@ -55,7 +56,7 @@ class SNLblock2d(nn.Module):
             # [N, 1, H * W]
             context_mask = context_mask.view(batch, 1, height * width)
             # [N, 1, H * W]
-            context_mask = self.softmax(context_mask)#softmax操作
+            context_mask = self.softmax(context_mask)  # softmax操作
             # [N, 1, H * W, 1]
             context_mask = context_mask.unsqueeze(3)
             # [N, 1, C, 1]
@@ -84,44 +85,44 @@ class SNLblock2d(nn.Module):
 
         return out
 
-class ContextBlock2d(nn.Module):
 
-    def __init__(self, inplanes, planes, pool='att', fusions=['channel_add'], ratio=8):
+class ContextBlock2d(nn.Module):
+    def __init__(self, inplanes, planes, pool="att", fusions=["channel_add"], ratio=8):
         super(ContextBlock2d, self).__init__()
-        assert pool in ['avg', 'att']
-        assert all([f in ['channel_add', 'channel_mul'] for f in fusions])
-        assert len(fusions) > 0, 'at least one fusion should be used'
+        assert pool in ["avg", "att"]
+        assert all([f in ["channel_add", "channel_mul"] for f in fusions])
+        assert len(fusions) > 0, "at least one fusion should be used"
         self.inplanes = inplanes
         self.planes = planes
         self.pool = pool
         self.fusions = fusions
-        if 'att' in pool:
-            self.conv_mask = nn.Conv2d(inplanes, 1, kernel_size=1)#context Modeling
+        if "att" in pool:
+            self.conv_mask = nn.Conv2d(inplanes, 1, kernel_size=1)  # context Modeling
             self.softmax = nn.Softmax(dim=2)
         else:
             self.avg_pool = nn.AdaptiveAvgPool2d(1)
-        if 'channel_add' in fusions:
+        if "channel_add" in fusions:
             self.channel_add_conv = nn.Sequential(
                 nn.Conv2d(self.inplanes, self.planes // ratio, kernel_size=1),
                 nn.LayerNorm([self.planes // ratio, 1, 1]),
                 nn.ReLU(inplace=True),
-                nn.Conv2d(self.planes // ratio, self.inplanes, kernel_size=1)
+                nn.Conv2d(self.planes // ratio, self.inplanes, kernel_size=1),
             )
         else:
             self.channel_add_conv = None
-        if 'channel_mul' in fusions:
+        if "channel_mul" in fusions:
             self.channel_mul_conv = nn.Sequential(
                 nn.Conv2d(self.inplanes, self.planes // ratio, kernel_size=1),
                 nn.LayerNorm([self.planes // ratio, 1, 1]),
                 nn.ReLU(inplace=True),
-                nn.Conv2d(self.planes // ratio, self.inplanes, kernel_size=1)
+                nn.Conv2d(self.planes // ratio, self.inplanes, kernel_size=1),
             )
         else:
             self.channel_mul_conv = None
 
     def spatial_pool(self, x):
         batch, channel, height, width = x.size()
-        if self.pool == 'att':
+        if self.pool == "att":
             input_x = x
             # [N, C, H * W]
             input_x = input_x.view(batch, channel, height * width)
@@ -132,7 +133,7 @@ class ContextBlock2d(nn.Module):
             # [N, 1, H * W]
             context_mask = context_mask.view(batch, 1, height * width)
             # [N, 1, H * W]
-            context_mask = self.softmax(context_mask)#softmax操作
+            context_mask = self.softmax(context_mask)  # softmax操作
             # [N, 1, H * W, 1]
             context_mask = context_mask.unsqueeze(3)
             # [N, 1, C, 1]
@@ -165,8 +166,9 @@ class ContextBlock2d(nn.Module):
 
 def conv3x3(in_planes, out_planes, stride=1):
     "3x3 convolution with padding"
-    return nn.Conv2d(in_planes, out_planes, kernel_size=3, stride=stride,
-                     padding=1, bias=False)
+    return nn.Conv2d(
+        in_planes, out_planes, kernel_size=3, stride=stride, padding=1, bias=False
+    )
 
 
 class BasicBlock(nn.Module):
@@ -208,8 +210,9 @@ class BottleNeck(nn.Module):
         super(BottleNeck, self).__init__()
         self.conv1 = nn.Conv2d(inplanes, planes, kernel_size=1, bias=False)
         self.bn1 = nn.BatchNorm2d(planes)
-        self.conv2 = nn.Conv2d(planes, planes, kernel_size=3, stride=stride,
-                               padding=1, bias=False)
+        self.conv2 = nn.Conv2d(
+            planes, planes, kernel_size=3, stride=stride, padding=1, bias=False
+        )
         self.bn2 = nn.BatchNorm2d(planes)
         self.conv3 = nn.Conv2d(planes, planes * 4, kernel_size=1, bias=False)
         self.bn3 = nn.BatchNorm2d(planes * 4)
@@ -239,9 +242,11 @@ class BottleNeck(nn.Module):
 
         return out
 
-class ResNet(nn.Module):
 
-    def __init__(self, block, block1, num_block, num_classes=100, gc=False,type = "gc_all"):
+class ResNet(nn.Module):
+    def __init__(
+        self, block, block1, num_block, num_classes=100, gc=False, type="gc_all"
+    ):
         super().__init__()
 
         self.inplanes = 64
@@ -249,9 +254,10 @@ class ResNet(nn.Module):
         self.conv1 = nn.Sequential(
             nn.Conv2d(3, 64, kernel_size=3, padding=1, bias=False),
             nn.BatchNorm2d(64),
-            nn.ReLU(inplace=True))
-        #we use a different inputsize than the original paper
-        #so conv2_x's stride is 1
+            nn.ReLU(inplace=True),
+        )
+        # we use a different inputsize than the original paper
+        # so conv2_x's stride is 1
         self.conv2_x = self._make_layer(block, 64, num_block[0], 1)
         if type == "gc_all":
             self.conv3_x = self._make_layer2(block, block1, 128, num_block[1], 2, gc=gc)
@@ -273,8 +279,13 @@ class ResNet(nn.Module):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
@@ -282,36 +293,44 @@ class ResNet(nn.Module):
         layers.append(block(self.inplanes, planes, stride, downsample))
         self.inplanes = planes * block.expansion
         for i in range(1, blocks):
-            layers.append(block(self.inplanes, planes))       
+            layers.append(block(self.inplanes, planes))
         return nn.Sequential(*layers)
-
 
     def _make_layer1(self, block, block1, planes, blocks, stride=1, gc=False):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
         layers = []
         layers.append(block(self.inplanes, planes, stride, downsample))
         self.inplanes = planes * block.expansion
-        for i in range(1, blocks-1):
+        for i in range(1, blocks - 1):
             layers.append(block(self.inplanes, planes))
         layers.append(block1(self.inplanes, self.inplanes))
         layers.append(block(self.inplanes, planes))
 
         return nn.Sequential(*layers)
 
-
     def _make_layer2(self, block, block1, planes, blocks, stride=1, gc=False):
         downsample = None
         if stride != 1 or self.inplanes != planes * block.expansion:
             downsample = nn.Sequential(
-                nn.Conv2d(self.inplanes, planes * block.expansion,
-                          kernel_size=1, stride=stride, bias=False),
+                nn.Conv2d(
+                    self.inplanes,
+                    planes * block.expansion,
+                    kernel_size=1,
+                    stride=stride,
+                    bias=False,
+                ),
                 nn.BatchNorm2d(planes * block.expansion),
             )
 
@@ -326,7 +345,6 @@ class ResNet(nn.Module):
 
         return nn.Sequential(*layers)
 
-
     def forward(self, x):
         output = self.conv1(x)
         output = self.conv2_x(output)
@@ -337,39 +355,39 @@ class ResNet(nn.Module):
         output = output.view(output.size(0), -1)
         output = self.fc(output)
 
-        return output 
+        return output
+
 
 def resnet18():
-    """ return a ResNet 18 object
-    """
+    """return a ResNet 18 object"""
     return ResNet(BasicBlock, [2, 2, 2, 2])
 
+
 def resnet34():
-    """ return a ResNet 34 object
-    """
+    """return a ResNet 34 object"""
     return ResNet(BasicBlock, [3, 4, 6, 3])
 
+
 def GC_resnet50():
-    """ return a ResNet 50 object
-    """
-    return ResNet(BottleNeck, ContextBlock2d, [3, 4, 6, 3], gc=True,type = "gc")
+    """return a ResNet 50 object"""
+    return ResNet(BottleNeck, ContextBlock2d, [3, 4, 6, 3], gc=True, type="gc")
+
 
 def SNL_resnet50():
-    """ return a ResNet 50 object
-    """
-    return ResNet(BottleNeck, SNLblock2d, [3, 4, 6, 3], gc=True,type= "snl")
+    """return a ResNet 50 object"""
+    return ResNet(BottleNeck, SNLblock2d, [3, 4, 6, 3], gc=True, type="snl")
+
 
 def GC_all_resnet50():
-    """ return a ResNet 50 object
-    """
-    return ResNet(BottleNeck, ContextBlock2d, [3, 4, 6, 3], gc=True, type = "gc_all")
+    """return a ResNet 50 object"""
+    return ResNet(BottleNeck, ContextBlock2d, [3, 4, 6, 3], gc=True, type="gc_all")
+
 
 def resnet101():
-    """ return a ResNet 101 object
-    """
+    """return a ResNet 101 object"""
     return ResNet(BottleNeck, [3, 4, 23, 3])
 
+
 def resnet152():
-    """ return a ResNet 152 object
-    """
+    """return a ResNet 152 object"""
     return ResNet(BottleNeck, [3, 8, 36, 3])

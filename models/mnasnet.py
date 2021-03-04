@@ -1,4 +1,3 @@
-
 """
 https://arxiv.org/pdf/1807.11626.pdf
 """
@@ -13,7 +12,7 @@ def Conv_3x3(inp, oup, stride):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 3, stride, 1, bias=False),
         nn.BatchNorm2d(oup),
-        nn.ReLU6(inplace=True)
+        nn.ReLU6(inplace=True),
     )
 
 
@@ -21,13 +20,14 @@ def Conv_1x1(inp, oup):
     return nn.Sequential(
         nn.Conv2d(inp, oup, 1, 1, 0, bias=False),
         nn.BatchNorm2d(oup),
-        nn.ReLU6(inplace=True)
+        nn.ReLU6(inplace=True),
     )
 
-def SepConv_3x3(inp, oup): #input=32, output=16
+
+def SepConv_3x3(inp, oup):  # input=32, output=16
     return nn.Sequential(
         # dw
-        nn.Conv2d(inp, inp , 3, 1, 1, groups=inp, bias=False),
+        nn.Conv2d(inp, inp, 3, 1, 1, groups=inp, bias=False),
         nn.BatchNorm2d(inp),
         nn.ReLU6(inplace=True),
         # pw-linear
@@ -50,7 +50,15 @@ class InvertedResidual(nn.Module):
             nn.BatchNorm2d(inp * expand_ratio),
             nn.ReLU6(inplace=True),
             # dw
-            nn.Conv2d(inp * expand_ratio, inp * expand_ratio, kernel, stride, kernel // 2, groups=inp * expand_ratio, bias=False),
+            nn.Conv2d(
+                inp * expand_ratio,
+                inp * expand_ratio,
+                kernel,
+                stride,
+                kernel // 2,
+                groups=inp * expand_ratio,
+                bias=False,
+            ),
             nn.BatchNorm2d(inp * expand_ratio),
             nn.ReLU6(inplace=True),
             # pw-linear
@@ -66,16 +74,16 @@ class InvertedResidual(nn.Module):
 
 
 class MnasNet(nn.Module):
-    def __init__(self, n_class=1000, input_size=224, width_mult=1.):
+    def __init__(self, n_class=1000, input_size=224, width_mult=1.0):
         super(MnasNet, self).__init__()
 
         # setting of inverted residual blocks
         self.interverted_residual_setting = [
             # t, c, n, s, k
-            [3, 24,  3, 2, 3],  # -> 56x56
-            [3, 40,  3, 2, 5],  # -> 28x28
-            [6, 80,  3, 2, 5],  # -> 14x14
-            [6, 96,  2, 1, 3],  # -> 14x14
+            [3, 24, 3, 2, 3],  # -> 56x56
+            [3, 40, 3, 2, 5],  # -> 28x28
+            [6, 80, 3, 2, 5],  # -> 14x14
+            [6, 96, 2, 1, 3],  # -> 14x14
             [6, 192, 4, 2, 5],  # -> 7x7
             [6, 320, 1, 1, 3],  # -> 7x7
         ]
@@ -93,9 +101,13 @@ class MnasNet(nn.Module):
             output_channel = int(c * width_mult)
             for i in range(n):
                 if i == 0:
-                    self.features.append(InvertedResidual(input_channel, output_channel, s, t, k))
+                    self.features.append(
+                        InvertedResidual(input_channel, output_channel, s, t, k)
+                    )
                 else:
-                    self.features.append(InvertedResidual(input_channel, output_channel, 1, t, k))
+                    self.features.append(
+                        InvertedResidual(input_channel, output_channel, 1, t, k)
+                    )
                 input_channel = output_channel
 
         # building last several layers
@@ -123,7 +135,7 @@ class MnasNet(nn.Module):
         for m in self.modules():
             if isinstance(m, nn.Conv2d):
                 n = m.kernel_size[0] * m.kernel_size[1] * m.out_channels
-                m.weight.data.normal_(0, math.sqrt(2. / n))
+                m.weight.data.normal_(0, math.sqrt(2.0 / n))
                 if m.bias is not None:
                     m.bias.data.zero_()
             elif isinstance(m, nn.BatchNorm2d):
@@ -135,7 +147,7 @@ class MnasNet(nn.Module):
                 m.bias.data.zero_()
 
 
-if __name__ == '__main__':
+if __name__ == "__main__":
     net = MnasNet()
     x_image = Variable(torch.randn(1, 3, 224, 224))
     y = net(x_image)

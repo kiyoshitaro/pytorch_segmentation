@@ -19,12 +19,11 @@ import torch.nn.functional as F
 
 
 class PositionAttentionModule(nn.Module):
-    ''' self-attention '''
+    """ self-attention """
 
-    def __init__(self, in_channels):        
+    def __init__(self, in_channels):
         super().__init__()
-        self.query_conv = nn.Conv2d(
-            in_channels, in_channels // 8, kernel_size=1)
+        self.query_conv = nn.Conv2d(in_channels, in_channels // 8, kernel_size=1)
         self.key_conv = nn.Conv2d(in_channels, in_channels // 8, kernel_size=1)
         self.value_conv = nn.Conv2d(in_channels, in_channels, kernel_size=1)
         self.gamma = nn.Parameter(torch.zeros(1))
@@ -40,20 +39,19 @@ class PositionAttentionModule(nn.Module):
         """
 
         N, C, H, W = x.shape
-        query = self.query_conv(x).view(
-            N, -1, H*W).permute(0, 2, 1)  # (N, H*W, C')
-        key = self.key_conv(x).view(N, -1, H*W)  # (N, C', H*W)
+        query = self.query_conv(x).view(N, -1, H * W).permute(0, 2, 1)  # (N, H*W, C')
+        key = self.key_conv(x).view(N, -1, H * W)  # (N, C', H*W)
 
         # caluculate correlation
-        energy = torch.bmm(query, key)    # (N, H*W, H*W)
+        energy = torch.bmm(query, key)  # (N, H*W, H*W)
         # spatial normalize
         attention = self.softmax(energy)
 
-        value = self.value_conv(x).view(N, -1, H*W)    # (N, C, H*W)
+        value = self.value_conv(x).view(N, -1, H * W)  # (N, C, H*W)
 
         out = torch.bmm(value, attention.permute(0, 2, 1))
         out = out.view(N, C, H, W)
-        out = self.gamma*out + x
+        out = self.gamma * out + x
         return out
 
 
@@ -72,20 +70,19 @@ class ChannelAttentionModule(nn.Module):
         """
 
         N, C, H, W = x.shape
-        query = x.view(N, C, -1)    # (N, C, H*W)
-        key = x.view(N, C, -1).permute(0, 2, 1)    # (N, H*W, C)
+        query = x.view(N, C, -1)  # (N, C, H*W)
+        key = x.view(N, C, -1).permute(0, 2, 1)  # (N, H*W, C)
 
         # calculate correlation
-        energy = torch.bmm(query, key)    # (N, C, C)
-        energy = torch.max(
-            energy, -1, keepdim=True)[0].expand_as(energy) - energy
+        energy = torch.bmm(query, key)  # (N, C, C)
+        energy = torch.max(energy, -1, keepdim=True)[0].expand_as(energy) - energy
         attention = self.softmax(energy)
 
         value = x.view(N, C, -1)
 
         out = torch.bmm(attention, value)
         out = out.view(N, C, H, W)
-        out = self.gamma*out + x
+        out = self.gamma * out + x
         return out
 
 
@@ -94,36 +91,33 @@ class DANet(nn.Module):
         super().__init__()
 
         # set a base model
-        if config.model == 'drn_d_22':
-            print('Dilated ResNet D 22 wil be used as a base model')
+        if config.model == "drn_d_22":
+            print("Dilated ResNet D 22 wil be used as a base model")
             self.base = drn_d_22(pretrained=True)
             # remove the last layer (out_conv)
-            self.base = nn.Sequential(
-                *list(self.base.children())[:-1])
-        elif config.model == 'drn_d_38':
-            print('Dilated ResNet D 38 wil be used as a base model')
+            self.base = nn.Sequential(*list(self.base.children())[:-1])
+        elif config.model == "drn_d_38":
+            print("Dilated ResNet D 38 wil be used as a base model")
             self.base = drn_d_38(pretrained=True)
             # remove the last layer (out_conv)
-            self.base = nn.Sequential(
-                *list(self.base.children())[:-1])
+            self.base = nn.Sequential(*list(self.base.children())[:-1])
         else:
-            print('There is no option you choose as a base model.')
-            print('Instead, Dilated ResNet D 22 wil be used as a base model')
+            print("There is no option you choose as a base model.")
+            print("Instead, Dilated ResNet D 22 wil be used as a base model")
             self.base = drn_d_22(pretrained=True)
             # remove the last layer (out_conv)
-            self.base = nn.Sequential(
-                *list(self.base.children())[:-1])
+            self.base = nn.Sequential(*list(self.base.children())[:-1])
 
         # convolution before attention modules
         self.conv2pam = nn.Sequential(
             nn.Conv2d(inter_channel, inter_channel, 3, padding=1, bias=False),
             nn.BatchNorm2d(inter_channel),
-            nn.ReLU()
+            nn.ReLU(),
         )
         self.conv2cam = nn.Sequential(
             nn.Conv2d(inter_channel, inter_channel, 3, padding=1, bias=False),
             nn.BatchNorm2d(inter_channel),
-            nn.ReLU()
+            nn.ReLU(),
         )
 
         # attention modules
@@ -134,24 +128,23 @@ class DANet(nn.Module):
         self.pam2conv = nn.Sequential(
             nn.Conv2d(inter_channel, inter_channel, 3, padding=1, bias=False),
             nn.BatchNorm2d(inter_channel),
-            nn.ReLU())
+            nn.ReLU(),
+        )
         self.cam2conv = nn.Sequential(
             nn.Conv2d(inter_channel, inter_channel, 3, padding=1, bias=False),
             nn.BatchNorm2d(inter_channel),
-            nn.ReLU())
+            nn.ReLU(),
+        )
 
         # output layers for each attention module and sum features.
         self.conv_pam_out = nn.Sequential(
-            nn.Dropout2d(0.1, False),
-            nn.Conv2d(inter_channel, config.n_classes, 1)
+            nn.Dropout2d(0.1, False), nn.Conv2d(inter_channel, config.n_classes, 1)
         )
         self.conv_cam_out = nn.Sequential(
-            nn.Dropout2d(0.1, False),
-            nn.Conv2d(inter_channel, config.n_classes, 1)
+            nn.Dropout2d(0.1, False), nn.Conv2d(inter_channel, config.n_classes, 1)
         )
         self.conv_out = nn.Sequential(
-            nn.Dropout2d(0.1, False),
-            nn.Conv2d(inter_channel, config.n_classes, 1)
+            nn.Dropout2d(0.1, False), nn.Conv2d(inter_channel, config.n_classes, 1)
         )
 
         for m in self.modules():

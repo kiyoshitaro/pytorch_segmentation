@@ -13,9 +13,15 @@ from torch.nn import Module, Parameter
 from .base import BaseNet
 from ..nn import SyncBatchNorm, Encoding, Mean
 
-__all__ = ['EncNet', 'EncModule', 'get_encnet', 'get_encnet_resnet50_pcontext',
-           'get_encnet_resnet101_pcontext', 'get_encnet_resnet50_ade',
-           'get_encnet_resnet101_ade']
+__all__ = [
+    "EncNet",
+    "EncModule",
+    "get_encnet",
+    "get_encnet_resnet50_pcontext",
+    "get_encnet_resnet101_pcontext",
+    "get_encnet_resnet50_ade",
+    "get_encnet_resnet101_ade",
+]
 
 
 class Mean(nn.Module):
@@ -26,7 +32,6 @@ class Mean(nn.Module):
 
     def forward(self, input):
         return input.mean(self.dim, self.keep_dim)
-
 
 
 class Encoding(Module):
@@ -73,6 +78,7 @@ class Encoding(Module):
         >>> layer = encoding.Encoding(C,K).double().cuda()
         >>> E = layer(X)
     """
+
     def __init__(self, D, K):
         super(Encoding, self).__init__()
         # init codewords and smoothing factor
@@ -82,13 +88,13 @@ class Encoding(Module):
         self.reset_params()
 
     def reset_params(self):
-        std1 = 1./((self.K*self.D)**(1/2))
+        std1 = 1.0 / ((self.K * self.D) ** (1 / 2))
         self.codewords.data.uniform_(-std1, std1)
         self.scale.data.uniform_(-1, 0)
 
     def forward(self, X):
         # input X is a 4D tensor
-        assert(X.size(1) == self.D)
+        assert X.size(1) == self.D
         B, D = X.size(0), self.D
         if X.dim() == 3:
             # BxDxN => BxNxD
@@ -97,7 +103,7 @@ class Encoding(Module):
             # BxDxHxW => Bx(HW)xD
             X = X.view(B, D, -1).transpose(1, 2).contiguous()
         else:
-            raise RuntimeError('Encoding Layer unknown input dims!')
+            raise RuntimeError("Encoding Layer unknown input dims!")
         # assignment weights BxNxK
         A = F.softmax(scaled_l2(X, self.codewords, self.scale), dim=2)
         # aggregate
@@ -105,9 +111,18 @@ class Encoding(Module):
         return E
 
     def __repr__(self):
-        return self.__class__.__name__ + '(' \
-            + 'N x ' + str(self.D) + '=>' + str(self.K) + 'x' \
-            + str(self.D) + ')'
+        return (
+            self.__class__.__name__
+            + "("
+            + "N x "
+            + str(self.D)
+            + "=>"
+            + str(self.K)
+            + "x"
+            + str(self.D)
+            + ")"
+        )
+
 
 class SyncBatchNorm(_BatchNorm):
     r"""Cross-GPU Synchronized Batch normalization (SyncBN)
@@ -150,12 +165,22 @@ class SyncBatchNorm(_BatchNorm):
         >>> output = net(input)
     """
 
-    def __init__(self, num_features, eps=1e-5, momentum=0.1, sync=True, activation="none", slope=0.01,
-                 inplace=True):
-        super(SyncBatchNorm, self).__init__(num_features, eps=eps, momentum=momentum, affine=True)
+    def __init__(
+        self,
+        num_features,
+        eps=1e-5,
+        momentum=0.1,
+        sync=True,
+        activation="none",
+        slope=0.01,
+        inplace=True,
+    ):
+        super(SyncBatchNorm, self).__init__(
+            num_features, eps=eps, momentum=momentum, affine=True
+        )
         self.activation = activation
-        self.inplace = False if activation == 'none' else inplace
-        #self.inplace = inplace
+        self.inplace = False if activation == "none" else inplace
+        # self.inplace = inplace
         self.slope = slope
         self.devices = list(range(torch.cuda.device_count()))
         self.sync = sync if len(self.devices) > 1 else False
@@ -164,7 +189,7 @@ class SyncBatchNorm(_BatchNorm):
         self.master_queue = Queue(len(self.worker_ids))
         self.worker_queues = [Queue(1) for _ in self.worker_ids]
         # running_exs
-        #self.register_buffer('running_exs', torch.ones(num_features))
+        # self.register_buffer('running_exs', torch.ones(num_features))
 
     def forward(self, x):
         # Resize the input to (B, C, -1).
@@ -176,67 +201,115 @@ class SyncBatchNorm(_BatchNorm):
                 "is_master": True,
                 "master_queue": self.master_queue,
                 "worker_queues": self.worker_queues,
-                "worker_ids": self.worker_ids
+                "worker_ids": self.worker_ids,
             }
         else:
             # Worker mode
             extra = {
                 "is_master": False,
                 "master_queue": self.master_queue,
-                "worker_queue": self.worker_queues[self.worker_ids.index(x.get_device())]
+                "worker_queue": self.worker_queues[
+                    self.worker_ids.index(x.get_device())
+                ],
             }
         if self.inplace:
-            return inp_syncbatchnorm(x, self.weight, self.bias, self.running_mean, self.running_var,
-                                     extra, self.sync, self.training, self.momentum, self.eps,
-                                     self.activation, self.slope).view(input_shape)
+            return inp_syncbatchnorm(
+                x,
+                self.weight,
+                self.bias,
+                self.running_mean,
+                self.running_var,
+                extra,
+                self.sync,
+                self.training,
+                self.momentum,
+                self.eps,
+                self.activation,
+                self.slope,
+            ).view(input_shape)
         else:
-            return syncbatchnorm(x, self.weight, self.bias, self.running_mean, self.running_var,
-                                 extra, self.sync, self.training, self.momentum, self.eps,
-                                 self.activation, self.slope).view(input_shape)
+            return syncbatchnorm(
+                x,
+                self.weight,
+                self.bias,
+                self.running_mean,
+                self.running_var,
+                extra,
+                self.sync,
+                self.training,
+                self.momentum,
+                self.eps,
+                self.activation,
+                self.slope,
+            ).view(input_shape)
 
     def extra_repr(self):
-        if self.activation == 'none':
-            return 'sync={}'.format(self.sync)
+        if self.activation == "none":
+            return "sync={}".format(self.sync)
         else:
-            return 'sync={}, act={}, slope={}, inplace={}'.format(
+            return "sync={}, act={}, slope={}, inplace={}".format(
                 self.sync, self.activation, self.slope, self.inplace
             )
 
 
 class FCNHead(nn.Module):
-    def __init__(self, in_channels, out_channels, norm_layer, up_kwargs={}, with_global=False):
+    def __init__(
+        self, in_channels, out_channels, norm_layer, up_kwargs={}, with_global=False
+    ):
         super(FCNHead, self).__init__()
         inter_channels = in_channels // 4
         self._up_kwargs = up_kwargs
         if with_global:
-            self.conv5 = nn.Sequential(nn.Conv2d(in_channels, inter_channels, 3, padding=1, bias=False),
-                                       norm_layer(inter_channels),
-                                       nn.ReLU(),
-                                       ConcurrentModule([
-                                            Identity(),
-                                            GlobalPooling(inter_channels, inter_channels,
-                                                          norm_layer, self._up_kwargs),
-                                       ]),
-                                       nn.Dropout2d(0.1, False),
-                                       nn.Conv2d(2*inter_channels, out_channels, 1))
+            self.conv5 = nn.Sequential(
+                nn.Conv2d(in_channels, inter_channels, 3, padding=1, bias=False),
+                norm_layer(inter_channels),
+                nn.ReLU(),
+                ConcurrentModule(
+                    [
+                        Identity(),
+                        GlobalPooling(
+                            inter_channels, inter_channels, norm_layer, self._up_kwargs
+                        ),
+                    ]
+                ),
+                nn.Dropout2d(0.1, False),
+                nn.Conv2d(2 * inter_channels, out_channels, 1),
+            )
         else:
-            self.conv5 = nn.Sequential(nn.Conv2d(in_channels, inter_channels, 3, padding=1, bias=False),
-                                       norm_layer(inter_channels),
-                                       nn.ReLU(),
-                                       nn.Dropout2d(0.1, False),
-                                       nn.Conv2d(inter_channels, out_channels, 1))
+            self.conv5 = nn.Sequential(
+                nn.Conv2d(in_channels, inter_channels, 3, padding=1, bias=False),
+                norm_layer(inter_channels),
+                nn.ReLU(),
+                nn.Dropout2d(0.1, False),
+                nn.Conv2d(inter_channels, out_channels, 1),
+            )
 
     def forward(self, x):
         return self.conv5(x)
 
+
 class EncNet(BaseNet):
-    def __init__(self, nclass, backbone, aux=True, se_loss=True, lateral=False,
-                 norm_layer=SyncBatchNorm, **kwargs):
-        super(EncNet, self).__init__(nclass, backbone, aux, se_loss,
-                                     norm_layer=norm_layer, **kwargs)
-        self.head = EncHead(2048, self.nclass, se_loss=se_loss,
-                            lateral=lateral, norm_layer=norm_layer,
-                            up_kwargs=self._up_kwargs)
+    def __init__(
+        self,
+        nclass,
+        backbone,
+        aux=True,
+        se_loss=True,
+        lateral=False,
+        norm_layer=SyncBatchNorm,
+        **kwargs
+    ):
+        super(EncNet, self).__init__(
+            nclass, backbone, aux, se_loss, norm_layer=norm_layer, **kwargs
+        )
+        self.head = EncHead(
+            2048,
+            self.nclass,
+            se_loss=se_loss,
+            lateral=lateral,
+            norm_layer=norm_layer,
+            up_kwargs=self._up_kwargs,
+        )
         if aux:
             self.auxlayer = FCNHead(1024, nclass, norm_layer=norm_layer)
 
@@ -264,10 +337,9 @@ class EncModule(nn.Module):
             Encoding(D=in_channels, K=ncodes),
             norm_layer(ncodes),
             nn.ReLU(inplace=True),
-            Mean(dim=1))
-        self.fc = nn.Sequential(
-            nn.Linear(in_channels, in_channels),
-            nn.Sigmoid())
+            Mean(dim=1),
+        )
+        self.fc = nn.Sequential(nn.Linear(in_channels, in_channels), nn.Sigmoid())
         if self.se_loss:
             self.selayer = nn.Linear(in_channels, nclass)
 
@@ -283,8 +355,15 @@ class EncModule(nn.Module):
 
 
 class EncHead(nn.Module):
-    def __init__(self, in_channels, out_channels, se_loss=True, lateral=True,
-                 norm_layer=None, up_kwargs=None):
+    def __init__(
+        self,
+        in_channels,
+        out_channels,
+        se_loss=True,
+        lateral=True,
+        norm_layer=None,
+        up_kwargs=None,
+    ):
         super(EncHead, self).__init__()
         self.se_loss = se_loss
         self.lateral = lateral
@@ -292,26 +371,34 @@ class EncHead(nn.Module):
         self.conv5 = nn.Sequential(
             nn.Conv2d(in_channels, 512, 3, padding=1, bias=False),
             norm_layer(512),
-            nn.ReLU(inplace=True))
+            nn.ReLU(inplace=True),
+        )
         if lateral:
-            self.connect = nn.ModuleList([
-                nn.Sequential(
-                    nn.Conv2d(512, 512, kernel_size=1, bias=False),
-                    norm_layer(512),
-                    nn.ReLU(inplace=True)),
-                nn.Sequential(
-                    nn.Conv2d(1024, 512, kernel_size=1, bias=False),
-                    norm_layer(512),
-                    nn.ReLU(inplace=True)),
-            ])
+            self.connect = nn.ModuleList(
+                [
+                    nn.Sequential(
+                        nn.Conv2d(512, 512, kernel_size=1, bias=False),
+                        norm_layer(512),
+                        nn.ReLU(inplace=True),
+                    ),
+                    nn.Sequential(
+                        nn.Conv2d(1024, 512, kernel_size=1, bias=False),
+                        norm_layer(512),
+                        nn.ReLU(inplace=True),
+                    ),
+                ]
+            )
             self.fusion = nn.Sequential(
-                    nn.Conv2d(3*512, 512, kernel_size=3, padding=1, bias=False),
-                    norm_layer(512),
-                    nn.ReLU(inplace=True))
-        self.encmodule = EncModule(512, out_channels, ncodes=32,
-            se_loss=se_loss, norm_layer=norm_layer)
-        self.conv6 = nn.Sequential(nn.Dropout2d(0.1, False),
-                                   nn.Conv2d(512, out_channels, 1))
+                nn.Conv2d(3 * 512, 512, kernel_size=3, padding=1, bias=False),
+                norm_layer(512),
+                nn.ReLU(inplace=True),
+            )
+        self.encmodule = EncModule(
+            512, out_channels, ncodes=32, se_loss=se_loss, norm_layer=norm_layer
+        )
+        self.conv6 = nn.Sequential(
+            nn.Dropout2d(0.1, False), nn.Conv2d(512, out_channels, 1)
+        )
 
     def forward(self, *inputs):
         feat = self.conv5(inputs[-1])
@@ -324,8 +411,13 @@ class EncHead(nn.Module):
         return tuple(outs)
 
 
-def get_encnet(dataset='pascal_voc', backbone='resnet50', pretrained=False,
-               root='~/.encoding/models', **kwargs):
+def get_encnet(
+    dataset="pascal_voc",
+    backbone="resnet50",
+    pretrained=False,
+    root="~/.encoding/models",
+    **kwargs
+):
     r"""EncNet model from the paper `"Context Encoding for Semantic Segmentation"
     <https://arxiv.org/pdf/1803.08904.pdf>`_
     Parameters
@@ -343,17 +435,27 @@ def get_encnet(dataset='pascal_voc', backbone='resnet50', pretrained=False,
     >>> model = get_encnet(dataset='pascal_voc', backbone='resnet50', pretrained=False)
     >>> print(model)
     """
-    kwargs['lateral'] = True if dataset.lower().startswith('p') else False
+    kwargs["lateral"] = True if dataset.lower().startswith("p") else False
     # infer number of classes
     from ..datasets import datasets, acronyms
-    model = EncNet(datasets[dataset.lower()].NUM_CLASS, backbone=backbone, root=root, **kwargs)
+
+    model = EncNet(
+        datasets[dataset.lower()].NUM_CLASS, backbone=backbone, root=root, **kwargs
+    )
     if pretrained:
         from .model_store import get_model_file
-        model.load_state_dict(torch.load(
-            get_model_file('encnet_%s_%s'%(backbone, acronyms[dataset]), root=root)))
+
+        model.load_state_dict(
+            torch.load(
+                get_model_file(
+                    "encnet_%s_%s" % (backbone, acronyms[dataset]), root=root
+                )
+            )
+        )
     return model
 
-def get_encnet_resnet50_pcontext(pretrained=False, root='~/.encoding/models', **kwargs):
+
+def get_encnet_resnet50_pcontext(pretrained=False, root="~/.encoding/models", **kwargs):
     r"""EncNet-PSP model from the paper `"Context Encoding for Semantic Segmentation"
     <https://arxiv.org/pdf/1803.08904.pdf>`_
     Parameters
@@ -367,10 +469,21 @@ def get_encnet_resnet50_pcontext(pretrained=False, root='~/.encoding/models', **
     >>> model = get_encnet_resnet50_pcontext(pretrained=True)
     >>> print(model)
     """
-    return get_encnet('pcontext', 'resnet50', pretrained, root=root, aux=True,
-                      base_size=520, crop_size=480, **kwargs)
+    return get_encnet(
+        "pcontext",
+        "resnet50",
+        pretrained,
+        root=root,
+        aux=True,
+        base_size=520,
+        crop_size=480,
+        **kwargs
+    )
 
-def get_encnet_resnet101_pcontext(pretrained=False, root='~/.encoding/models', **kwargs):
+
+def get_encnet_resnet101_pcontext(
+    pretrained=False, root="~/.encoding/models", **kwargs
+):
     r"""EncNet-PSP model from the paper `"Context Encoding for Semantic Segmentation"
     <https://arxiv.org/pdf/1803.08904.pdf>`_
     Parameters
@@ -384,10 +497,19 @@ def get_encnet_resnet101_pcontext(pretrained=False, root='~/.encoding/models', *
     >>> model = get_encnet_resnet101_pcontext(pretrained=True)
     >>> print(model)
     """
-    return get_encnet('pcontext', 'resnet101', pretrained, root=root, aux=True,
-                      base_size=520, crop_size=480, **kwargs)
+    return get_encnet(
+        "pcontext",
+        "resnet101",
+        pretrained,
+        root=root,
+        aux=True,
+        base_size=520,
+        crop_size=480,
+        **kwargs
+    )
 
-def get_encnet_resnet50_ade(pretrained=False, root='~/.encoding/models', **kwargs):
+
+def get_encnet_resnet50_ade(pretrained=False, root="~/.encoding/models", **kwargs):
     r"""EncNet-PSP model from the paper `"Context Encoding for Semantic Segmentation"
     <https://arxiv.org/pdf/1803.08904.pdf>`_
     Parameters
@@ -401,10 +523,19 @@ def get_encnet_resnet50_ade(pretrained=False, root='~/.encoding/models', **kwarg
     >>> model = get_encnet_resnet50_ade(pretrained=True)
     >>> print(model)
     """
-    return get_encnet('ade20k', 'resnet50', pretrained, root=root, aux=True,
-                      base_size=520, crop_size=480, **kwargs)
+    return get_encnet(
+        "ade20k",
+        "resnet50",
+        pretrained,
+        root=root,
+        aux=True,
+        base_size=520,
+        crop_size=480,
+        **kwargs
+    )
 
-def get_encnet_resnet101_ade(pretrained=False, root='~/.encoding/models', **kwargs):
+
+def get_encnet_resnet101_ade(pretrained=False, root="~/.encoding/models", **kwargs):
     r"""EncNet-PSP model from the paper `"Context Encoding for Semantic Segmentation"
     <https://arxiv.org/pdf/1803.08904.pdf>`_
     Parameters
@@ -418,10 +549,19 @@ def get_encnet_resnet101_ade(pretrained=False, root='~/.encoding/models', **kwar
     >>> model = get_encnet_resnet50_ade(pretrained=True)
     >>> print(model)
     """
-    return get_encnet('ade20k', 'resnet101', pretrained, root=root, aux=True,
-                      base_size=640, crop_size=576, **kwargs)
+    return get_encnet(
+        "ade20k",
+        "resnet101",
+        pretrained,
+        root=root,
+        aux=True,
+        base_size=640,
+        crop_size=576,
+        **kwargs
+    )
 
-def get_encnet_resnet152_ade(pretrained=False, root='~/.encoding/models', **kwargs):
+
+def get_encnet_resnet152_ade(pretrained=False, root="~/.encoding/models", **kwargs):
     r"""EncNet-PSP model from the paper `"Context Encoding for Semantic Segmentation"
     <https://arxiv.org/pdf/1803.08904.pdf>`_
     Parameters
@@ -435,5 +575,13 @@ def get_encnet_resnet152_ade(pretrained=False, root='~/.encoding/models', **kwar
     >>> model = get_encnet_resnet50_ade(pretrained=True)
     >>> print(model)
     """
-    return get_encnet('ade20k', 'resnet152', pretrained, root=root, aux=True,
-                      base_size=520, crop_size=480, **kwargs)
+    return get_encnet(
+        "ade20k",
+        "resnet152",
+        pretrained,
+        root=root,
+        aux=True,
+        base_size=520,
+        crop_size=480,
+        **kwargs
+    )
